@@ -3,34 +3,32 @@ This script downloads the alexa top 1M sites, unzips it, and reads the CSV and
 returns a list of the top N sites.
 """
 
-import zipfile
-import cStringIO
-from urllib import urlopen
+from bs4 import BeautifulSoup
+from math import ceil
+import requests
 
-ALEXA_DATA_URL = 'http://s3.amazonaws.com/alexa-static/top-1m.csv.zip'
-
-
-def alexa_etl():
-    """
-    Generator that:
-        Extracts by downloading the csv.zip, unzipping.
-        Transforms the data into python via CSV lib
-        Loads it to the end user as a python list
-    """
-
-    f = urlopen(ALEXA_DATA_URL)
-    buf = cStringIO.StringIO(f.read())
-    zfile = zipfile.ZipFile(buf)
-    buf = cStringIO.StringIO(zfile.read('top-1m.csv'))
-    for line in buf:
-        (rank, domain) = line.split(',')
-        yield (int(rank), domain.strip())
+ALEXA_DATA_URL = 'http://www.alexa.com/topsites/global'
 
 
-def top_list(num=100):
-    a = alexa_etl()
-    return [a.next() for x in xrange(num)]
+def top_list(n=500):
+    count = 0
+    alist = []
+    pages = int(ceil(n/25.0))
+    for page in range(0, pages):
+        response = requests.get(ALEXA_DATA_URL + ";" + str(page))
+        soup = BeautifulSoup(response.text, "lxml")
+        websites = soup.find_all('li', {'class':'site-listing'})
+        for website in websites:
+            count = count + 1
+            if count > n:
+                break
+            alist.append((int(website.div.contents[0]), website.a.contents[0].lower()))
+        if count > n:
+            break
+    return alist
 
 
-if __name__ == "__main__":
+
+
+if __name__ == "__main__": # pragma: no cover
     print top_list()
